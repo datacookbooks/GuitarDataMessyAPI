@@ -33,6 +33,40 @@
 # CMD ["bash", "start.sh"]
 
 
+
+
+
+
+
+
+# # Use Python 3.12 slim image as base
+# FROM python:3.12-slim
+
+# # Set working directory in container
+# WORKDIR /app
+
+# # Copy requirements file first (for better Docker layer caching)
+# COPY requirements.txt .
+
+# # Install Python dependencies
+# RUN pip install --no-cache-dir -r requirements.txt
+
+# # Copy all application files to container
+# COPY . .
+
+# # Initialize the database with historical data
+# RUN python database_setup.py
+
+# # Expose port 8000 (FastAPI default)
+# EXPOSE 8000
+
+# # Direct command for now - bypass the startup script
+# CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+
+
+
+
 # Use Python 3.12 slim image as base
 FROM python:3.12-slim
 
@@ -48,11 +82,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy all application files to container
 COPY . .
 
-# Initialize the database with historical data
-RUN python database_setup.py
+# Skip database initialization during build - do it at runtime instead
+# RUN python database_setup.py
 
 # Expose port 8000 (FastAPI default)
 EXPOSE 8000
 
-# Direct command for now - bypass the startup script
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Test with a simple Python command first
+CMD ["python", "-c", "print('Container started successfully'); import sys; sys.exit(0)"]
