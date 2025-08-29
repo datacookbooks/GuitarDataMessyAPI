@@ -19,8 +19,8 @@ RUN python database_setup.py
 # Expose port 8000 (FastAPI default)
 EXPOSE 8000
 
-# Create a startup script that handles the PORT environment variable
-RUN echo '#!/bin/bash\nuvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}' > start.sh && chmod +x start.sh
+# Create a startup script that handles both web and cron modes
+RUN echo '#!/bin/bash\nif [ "$RAILWAY_CRON_RUN" = "1" ]; then\n  python cron_runner.py\nelse\n  uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}\nfi' > start.sh && chmod +x start.sh
 
 # Use the startup script
 CMD ["./start.sh"]
