@@ -67,26 +67,44 @@
 
 
 
-# Use Python 3.12 slim image as base
+# # Use Python 3.12 slim image as base
+# FROM python:3.12-slim
+
+# # Set working directory in container
+# WORKDIR /app
+
+# # Copy requirements file first (for better Docker layer caching)
+# COPY requirements.txt .
+
+# # Install Python dependencies
+# RUN pip install --no-cache-dir -r requirements.txt
+
+# # Copy all application files to container
+# COPY . .
+
+# # Skip database initialization during build - do it at runtime instead
+# # RUN python database_setup.py
+
+# # Expose port 8000 (FastAPI default)
+# EXPOSE 8000
+
+# # Test with a simple Python command first
+# CMD ["python", "-c", "print('Container started successfully'); import sys; sys.exit(0)"]
+
+
+
+
 FROM python:3.12-slim
 
-# Set working directory in container
 WORKDIR /app
 
-# Copy requirements file first (for better Docker layer caching)
 COPY requirements.txt .
-
-# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy all application files to container
 COPY . .
 
-# Skip database initialization during build - do it at runtime instead
-# RUN python database_setup.py
+# Create empty database file
+RUN touch business_data.db
 
-# Expose port 8000 (FastAPI default)
-EXPOSE 8000
-
-# Test with a simple Python command first
-CMD ["python", "-c", "print('Container started successfully'); import sys; sys.exit(0)"]
+# Initialize database at runtime, not build time
+CMD python database_setup.py && uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
