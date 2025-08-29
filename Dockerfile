@@ -1,5 +1,5 @@
-# Use Python 3.11 slim image as base
-FROM python:3.11-slim
+# Use Python 3.12 slim image as base
+FROM python:3.12-slim
 
 # Set working directory in container
 WORKDIR /app
@@ -19,5 +19,8 @@ RUN python database_setup.py
 # Expose port 8000 (FastAPI default)
 EXPOSE 8000
 
-# Command to run the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Create a startup script that handles the PORT environment variable
+RUN echo '#!/bin/bash\nuvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}' > start.sh && chmod +x start.sh
+
+# Use the startup script
+CMD ["./start.sh"]
