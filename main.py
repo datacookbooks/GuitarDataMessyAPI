@@ -5,6 +5,7 @@ from typing import Optional, List
 from datetime import datetime, timedelta
 import os
 from daily_generator import run_daily_generation
+import logging
 
 app = FastAPI(
     title="Business Data API",
@@ -14,27 +15,40 @@ app = FastAPI(
 
 DATABASE_PATH = "business_data.db"
 
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
 def get_db_connection():
     """Get database connection"""
-    if not os.path.exists(DATABASE_PATH):
-        raise HTTPException(status_code=500, detail="Database not found")
-    return sqlite3.connect(DATABASE_PATH)
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        # Test if tables exist
+        cur = conn.cursor()
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables = cur.fetchall()
+        if not tables:
+            logger.error("Database exists but has no tables")
+            raise HTTPException(status_code=500, detail="Database has no tables")
+        return conn
+    except Exception as e:
+        logger.error(f"Database connection error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Database connection failed: {str(e)}")
 
 @app.get("/")
 def read_root():
     return {"message": "Business Data API", "version": "1.0.0"}
 
 @app.get("/health")
-def health_check():
+async def health_check():
     """Health check endpoint"""
     try:
         conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT 1")
         conn.close()
+        logger.info("Health check passed")
         return {"status": "healthy"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        logger.error(f"Health check failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/orders")
 def get_orders(
@@ -214,6 +228,20 @@ def get_latest_data():
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving latest data: {str(e)}")
+
+@app.on_event("startup")
+async def startup_event():
+    logger.info("Starting up API server")
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM orders")
+        orders_count = cur.fetchone()[0]
+        logger.info(f"Database connected successfully. Found {orders_count} orders.")
+        conn.close()
+    except Exception as e:
+        logger.error(f"Startup check failed: {str(e)}")
+        raise e
 
 # Add CORS middleware if needed for Power BI
 from fastapi.middleware.cors import CORSMiddleware

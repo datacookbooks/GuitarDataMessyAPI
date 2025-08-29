@@ -98,13 +98,16 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# Install sqlite3 CLI tool
+RUN apt-get update && apt-get install -y sqlite3
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Create empty database file
-RUN touch business_data.db
+# Make sure database directory is writable
+RUN touch business_data.db && chmod 666 business_data.db
 
-# Initialize database at runtime, not build time
-CMD python database_setup.py && uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
+# Initialize database first, then start the app
+CMD python database_setup.py && uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --log-level debug
