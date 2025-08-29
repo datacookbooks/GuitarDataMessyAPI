@@ -19,8 +19,15 @@ RUN python database_setup.py
 # Expose port 8000 (FastAPI default)
 EXPOSE 8000
 
-# Create a startup script that handles both web and cron modes
-RUN echo '#!/bin/bash\nif [ "$RAILWAY_CRON_RUN" = "1" ]; then\n  python cron_runner.py\nelse\n  uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}\nfi' > start.sh && chmod +x start.sh
+# Create a proper startup script
+RUN echo '#!/bin/bash\n\
+if [ "$RAILWAY_CRON_RUN" = "1" ]; then\n\
+  echo "Running cron job"\n\
+  python cron_runner.py\n\
+else\n\
+  echo "Starting web server"\n\
+  uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}\n\
+fi' > start.sh && chmod +x start.sh
 
 # Use the startup script
-CMD ["./start.sh"]
+CMD ["bash", "start.sh"]
