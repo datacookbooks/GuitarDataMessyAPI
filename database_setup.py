@@ -1,17 +1,27 @@
-import sqlite3
 import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
-import random
-from data_utils import make_messy_id, make_messy_vendor_id
+from pathlib import Path
+
+from db_config import get_db_connection, DATABASE_PATH
+
+
+ROOT_DIR = Path(__file__).resolve().parent
+
+ORDERS_CSV = ROOT_DIR / "df_orders_messy.csv"
+BIDS_CSV = ROOT_DIR / "df_vendor_bids_messy.csv"
+
 
 def setup_database():
-    """Initialize database and populate with historical data from CSV files"""
-    conn = sqlite3.connect('business_data.db')
+    """
+    Create the database and seed historical data only when
+    the relevant table is empty.
+
+    This is safe to run repeatedly.
+    """
+
+    conn = get_db_connection()
     cursor = conn.cursor()
-    
-    # Create tables
-    cursor.execute('''
+
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS orders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             id_customer INTEGER,
@@ -23,9 +33,9 @@ def setup_database():
             gender TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-    ''')
-    
-    cursor.execute('''
+    """)
+
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS vendor_bids (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             date TEXT,
@@ -34,75 +44,111 @@ def setup_database():
             price_wood_PerBF REAL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-    ''')
-    
-    # Load data from CSV files
-    load_orders_from_csv(cursor)
-    load_vendor_bids_from_csv(cursor)
-    
+    """)
+
+    conn.commit()
+
+    # --------------------------
+    # Seed historical orders
+    # --------------------------
+
+    orders_count = cursor.execute(
+        "SELECT COUNT(*) FROM orders"
+    ).fetchone()[0]
+
+    if orders_count == 0:
+        print("Orders table is empty. Loading historical CSV...")
+
+        df_orders = pd.read_csv(ORDERS_CSV)
+
+        rows = [
+            (
+                row["id_customer"],
+                row["id_model"],
+                row["id_distributor"],
+                row["time_order"],
+                row["date"],
+                row["age"],
+                row["gender"],
+            )
+            for _, row in df_orders.iterrows()
+        ]
+
+        cursor.executemany("""
+            INSERT INTO orders (
+                id_customer,
+                id_model,
+                id_distributor,
+                time_order,
+                date,
+                age,
+                gender
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, rows)
+
+        print(f"Loaded {len(rows)} historical orders.")
+
+    else:
+        print(
+            f"Orders table already contains "
+            f"{orders_count} rows; historical seed skipped."
+        )
+
+    # --------------------------
+    # Seed historical vendor bids
+    # --------------------------
+
+    bids_count = cursor.execute(
+        "SELECT COUNT(*) FROM vendor_bids"
+    ).fetchone()[0]
+
+    if bids_count == 0:
+        print("Vendor bids table is empty. Loading historical CSV...")
+
+        df_bids = pd.read_csv(BIDS_CSV)
+
+        rows = []
+
+        for _, row in df_bids.iterrows():
+            price = (
+                row["price_wood_PerBF"]
+                if pd.notna(row["price_wood_PerBF"])
+                else None
+            )
+
+            rows.append(
+                (
+                    row["date"],
+                    row["id_vendor"],
+                    row["type_wood"],
+                    price,
+                )
+            )
+
+        cursor.executemany("""
+            INSERT INTO vendor_bids (
+                date,
+                id_vendor,
+                type_wood,
+                price_wood_PerBF
+            )
+            VALUES (?, ?, ?, ?)
+        """, rows)
+
+        print(f"Loaded {len(rows)} historical vendor bids.")
+
+    else:
+        print(
+            f"Vendor bids table already contains "
+            f"{bids_count} rows; historical seed skipped."
+        )
+
     conn.commit()
     conn.close()
 
-def load_orders_from_csv(cursor):
-    """Load orders data from CSV file"""
-    try:
-        print("Loading orders data from df_orders_messy.csv...")
-        df_orders = pd.read_csv('df_orders_messy.csv')
-        
-        # Insert data into database
-        for _, row in df_orders.iterrows():
-            cursor.execute('''
-                INSERT INTO orders (id_customer, id_model, id_distributor, time_order, date, age, gender)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                row['id_customer'],
-                row['id_model'], 
-                row['id_distributor'],
-                row['time_order'],
-                row['date'],
-                row['age'],
-                row['gender']
-            ))
-        
-        print(f"SUCCESS: Loaded {len(df_orders)} orders from CSV")
-        
-    except FileNotFoundError:
-        print("ERROR: df_orders_messy.csv not found. Make sure the file is in the same directory.")
-        raise
-    except Exception as e:
-        print(f"ERROR: Error loading orders CSV: {e}")
-        raise
+    print(f"Database ready at {DATABASE_PATH}")
 
-def load_vendor_bids_from_csv(cursor):
-    """Load vendor bids data from CSV file"""
-    try:
-        print("Loading vendor bids data from df_vendor_bids_messy.csv...")
-        df_vendor_bids = pd.read_csv('df_vendor_bids_messy.csv')
-        
-        # Insert data into database
-        for _, row in df_vendor_bids.iterrows():
-            # Handle NaN values in price_wood_PerBF
-            price = row['price_wood_PerBF'] if pd.notna(row['price_wood_PerBF']) else None
-            
-            cursor.execute('''
-                INSERT INTO vendor_bids (date, id_vendor, type_wood, price_wood_PerBF)
-                VALUES (?, ?, ?, ?)
-            ''', (
-                row['date'],
-                row['id_vendor'],
-                row['type_wood'],
-                price
-            ))
-        
-        print(f"SUCCESS: Loaded {len(df_vendor_bids)} vendor bids from CSV")
-        
-    except FileNotFoundError:
-        print("ERROR: df_vendor_bids_messy.csv not found. Make sure the file is in the same directory.")
-        raise
-    except Exception as e:
-        print(f"ERROR: Error loading vendor bids CSV: {e}")
-        raise
 
 if __name__ == "__main__":
     setup_database()
-    print("Database initialized successfully!")
