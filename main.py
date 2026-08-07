@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -23,6 +25,8 @@ logging.basicConfig(level=logging.INFO)
 
 logger = logging.getLogger(__name__)
 
+ROOT_DIR = Path(__file__).resolve().parent
+REFERENCE_DATA_DIR = ROOT_DIR / "reference_data"
 
 def dataframe_records(df):
     """
@@ -89,6 +93,8 @@ def read_root():
         "endpoints": {
             "orders": "/api/orders",
             "vendor_bids": "/api/vendor-bids",
+            "models": "/api/models",
+            "distributors": "/api/distributors",
             "status": "/api/status",
             "health": "/health",
         },
@@ -272,6 +278,71 @@ def get_vendor_bids(
             ),
         )
 
+@app.get("/models")
+@app.get(
+    "/api/models",
+    include_in_schema=False
+)
+def get_models():
+
+    try:
+
+        file_path = (
+            REFERENCE_DATA_DIR
+            / "df_models.csv"
+        )
+
+        df = pd.read_csv(file_path)
+
+        return {
+            "data": dataframe_records(df),
+            "count": len(df),
+            "message":
+                "Models retrieved successfully",
+        }
+
+    except Exception as exc:
+
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Error retrieving models: "
+                + str(exc)
+            ),
+        )
+
+@app.get("/distributors")
+@app.get(
+    "/api/distributors",
+    include_in_schema=False
+)
+def get_distributors():
+
+    try:
+
+        file_path = (
+            REFERENCE_DATA_DIR
+            / "df_distributors.csv"
+        )
+
+        df = pd.read_csv(file_path)
+
+        return {
+            "data": dataframe_records(df),
+            "count": len(df),
+            "message":
+                "Distributors retrieved successfully",
+        }
+
+    except Exception as exc:
+
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Error retrieving distributors: "
+                + str(exc)
+            ),
+        )
 
 @app.get("/summary")
 @app.get(
