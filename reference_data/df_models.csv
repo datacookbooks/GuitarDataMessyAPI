@@ -1,0 +1,10 @@
+id_model,category,name,price,cost_build
+1,standard,Juno,650.0,350.0
+2,standard,Theros,670.0,350.0
+3,standard,Chronos,700.0,350.0
+4,premium,Nyx,850.0,400.0
+5,premium,Dia,900.0,410.0
+6,premium,Kamira,950.0,430.0
+7,boutique,Phoebe,1300.0,600.0
+8,boutique,Athena,1400.0,650.0
+9,boutique,Iris,1500.0,700.0
