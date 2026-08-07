@@ -1,0 +1,10 @@
+id_model,category,name,price,cost_build,material_body,material_neck,material_fretboard
+1,standard,Juno,650,350,maple,maple,maple
+2,standard,Theros,670,350,maple,maple,maple
+3,standard,Chronos,700,350,mahogany,maple,rosewood
+4,premium,Nyx,850,400,maple,maple,rosewood
+5,premium,Dia,900,410,maple,mahogany,rosewood
+6,premium,Kamira,950,430,mahogany,mahogany,maple
+7,boutique,Phoebe,1300,600,mahogany,mahogany,maple
+8,boutique,Athena,1400,650,mahogany,mahogany,rosewood
+9,boutique,Iris,1500,700,mahogany,mahogany,rosewood
