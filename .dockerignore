@@ -1,0 +1,7 @@
+venv_1/
+__pycache__/
+*.pyc
+.DS_Store
+.git/
+business_data.db
+*.pbix
