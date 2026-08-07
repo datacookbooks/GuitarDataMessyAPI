@@ -31,18 +31,41 @@ class DailyDataGenerator:
 
     def __init__(self):
 
+        # The historical seed runs from 2024-01-01 through 2025-08-28.
+        # Near the end of that seed, cleaned order volume averages about
+        # 6 orders/day and the fitted historical trend rises by about
+        # 1.8 orders/day per year. Continue that linear growth after the
+        # seed while preserving the original day-to-day noise.
+        self.order_growth = {
+            "anchor_date": date(2025, 8, 28),
+            "anchor_mean_orders": 6.0,
+            "orders_per_year": 1.8,
+            "daily_std_dev": 1.5,
+            "min_orders": 3,
+            "duplicate_day_prob": 0.05,
+        }
+
         self.final_trends = {
             "orders": {
+                # These were endpoint trends in the historical generator.
+                # Keep them stable rather than extrapolating indefinitely;
+                # otherwise boutique probability would eventually become
+                # negative and the regional probabilities would drift past
+                # sensible bounds.
                 "standard_prob": 0.4,
                 "premium_prob": 0.5,
                 "boutique_prob": 0.1,
                 "age_mean": 36,
+
+                # Endpoint regional probabilities implied by make_orders.py
+                # after normalization, in distributor-ID order 1..5:
+                # Northeast, Midwest, Southwest, West, Southeast.
                 "regional_probs": [
-                    0.25,
-                    0.15,
-                    0.225,
-                    0.20,
-                    0.175,
+                    0.2272727273,
+                    0.1363636364,
+                    0.2000000000,
+                    0.2090909091,
+                    0.2272727272,
                 ],
             },
 
@@ -124,10 +147,39 @@ class DailyDataGenerator:
             else 100000000
         )
 
-        # Preserve original ongoing-data behavior.
-        num_orders = int(np.random.randint(5, 8))
-
+        growth = self.order_growth
         trends = self.final_trends["orders"]
+
+        days_since_anchor = max(
+            0,
+            (target_date - growth["anchor_date"]).days
+        )
+
+        years_since_anchor = (
+            days_since_anchor / 365.25
+        )
+
+        expected_orders = (
+            growth["anchor_mean_orders"]
+            + growth["orders_per_year"] * years_since_anchor
+        )
+
+        # Match the historical generator's approximately Normal daily noise,
+        # but do not keep the old hard maximum of 7 orders/day. That ceiling
+        # is what would eventually stop the business from growing.
+        num_orders = max(
+            growth["min_orders"],
+            int(
+                np.rint(
+                    np.random.normal(
+                        expected_orders,
+                        growth["daily_std_dev"]
+                    )
+                )
+            )
+        )
+
+        daily_orders = []
 
         for _ in range(num_orders):
 
@@ -198,6 +250,16 @@ class DailyDataGenerator:
                 else "F"
             )
 
+            order_record = (
+                customer_id_counter,
+                messy_model,
+                messy_distributor,
+                unix_timestamp,
+                target_date.isoformat(),
+                age,
+                gender,
+            )
+
             cursor.execute("""
                 INSERT INTO orders (
                     id_customer,
@@ -209,25 +271,65 @@ class DailyDataGenerator:
                     gender
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (
-                customer_id_counter,
-                messy_model,
-                messy_distributor,
-                unix_timestamp,
-                target_date.isoformat(),
-                age,
-                gender,
-            ))
+            """, order_record)
 
+            daily_orders.append(order_record)
             customer_id_counter += 1
+
+        # The historical seed had a 5% chance per day of adding 1-2 exact
+        # duplicate rows. Restore that raw-data messiness. Power Query can
+        # continue removing these duplicates before analysis.
+        duplicate_count = 0
+
+        if (
+            daily_orders
+            and np.random.random() < growth["duplicate_day_prob"]
+        ):
+            num_duplicates = int(
+                np.random.randint(
+                    1,
+                    min(3, len(daily_orders) + 1)
+                )
+            )
+
+            duplicate_indices = np.random.choice(
+                len(daily_orders),
+                num_duplicates,
+                replace=False
+            )
+
+            for duplicate_index in np.atleast_1d(
+                duplicate_indices
+            ):
+                duplicate_record = daily_orders[
+                    int(duplicate_index)
+                ]
+
+                cursor.execute("""
+                    INSERT INTO orders (
+                        id_customer,
+                        id_model,
+                        id_distributor,
+                        time_order,
+                        date,
+                        age,
+                        gender
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, duplicate_record)
+
+                duplicate_count += 1
 
         conn.commit()
         conn.close()
 
         print(
-            f"Generated {num_orders} orders for {target_date}."
+            f"Generated {num_orders} unique orders "
+            f"(+{duplicate_count} duplicate rows) for {target_date}. "
+            f"Expected daily orders: {expected_orders:.2f}."
         )
 
+        # Keep the existing return semantics focused on unique orders.
         return num_orders
 
 
