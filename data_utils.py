@@ -4,7 +4,12 @@ Shared utility functions for data generation
 import numpy as np
 
 def make_messy_id(original_id, is_distributor=False):
-    """Make an id messy by randomly applying various transformations"""
+    """Make an id messy by randomly applying various transformations."""
+
+    # np.random.choice returns NumPy integer scalars.
+    # Convert to a native Python int before returning/inserting into SQLite.
+    original_id = int(original_id)
+
     # 20% chance to keep original as int
     if np.random.random() < 0.2:
         return original_id
@@ -39,7 +44,10 @@ def make_messy_id(original_id, is_distributor=False):
 
 
 def make_messy_vendor_id(original_id):
-    """Make vendor id messy by randomly applying various transformations"""
+    """Make vendor id messy by randomly applying various transformations."""
+
+    original_id = int(original_id)
+    
     # 30% chance to keep original as int
     if np.random.random() < 0.3:
         return original_id
